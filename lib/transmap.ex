@@ -35,14 +35,14 @@ defmodule Transmap do
       iex> Transmap.transform(map, rule, diff: true)
       %{a: %{c: 2}, d: %{e: 3, f: 4}}
 
-  Transfomation with _default:
+  Transfomation with `_default`:
 
       iex> map = %{a: 1, b: 2, c: %{d: 3, e: 4}}
       iex> rule = %{_default: true, b: false, c: %{_default: true}}
       iex> Transmap.transform(map, rule)
       %{a: 1, c: %{d: 3, e: 4}}
 
-  Transformation with _spread:
+  Transformation with `_spread`:
 
       iex> map = %{a: %{b: 1, c: 2}, d: %{e: %{f: 3, g: 4}, h: 5}}
       iex> rule = %{_spread: [[:a], [:d, :e]], a: true, d: %{e: %{f: true}}}
