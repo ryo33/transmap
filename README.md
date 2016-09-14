@@ -14,6 +14,8 @@ end
 
 ```elixir
 # Basic transformation:
+
+map = %{a: 1, b: 2, c: 3}
 rule = %{a: true}
 Transmap.transform(map, rule)
 == %{a: 1}
@@ -26,12 +28,14 @@ Transmap.transform(map, rule, diff: true)
 == %{a: %{c: 2}, d: %{e: 3, f: 4}}
 
 # Transfomation with _default:
+
 map = %{a: 1, b: 2, c: %{d: 3, e: 4}}
 rule = %{_default: true, b: false, c: %{_default: true}}
 Transmap.transform(map, rule)
 == %{a: 1, c: %{d: 3, e: 4}}
 
 # Transformation with _spread:
+
 map = %{a: %{b: 1, c: 2}, d: %{e: %{f: 3, g: 4}, h: 5}}
 rule = %{_spread: [[:a], [:d, :e]], a: true, d: %{e: %{f: true}}}
 Transmap.transform(map, rule)
@@ -40,6 +44,7 @@ Transmap.transform(map, rule, diff: true)
 == %{b: 1, c: 2, f: 3}
 
 # Transformation with renaming:
+
 map = %{a: 1, b: 2, c: %{d: 3, e: 4}, f: %{g: 5}}
 rule = %{_spread: [[:f]], a: {"A", true}, b: "B", c: {:C, %{d: 6}}, f: %{g: "G"}}
 Transmap.transform(map, rule)
