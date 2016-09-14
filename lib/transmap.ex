@@ -17,6 +17,8 @@ defmodule Transmap do
         {key, new_key} -> # Shorthand for {new_key, true}
       end
 
+  If the `:diff` option is `true`, removes empty maps in the result.
+
   ## Examples
 
   Basic transformation:
@@ -26,9 +28,11 @@ defmodule Transmap do
       iex> Transmap.transform(map, rule)
       %{a: 1}
 
-      iex> map = %{a: %{b: 1, c: 2}, d: %{e: 3, f: 4}}
-      iex> rule = %{a: %{c: true}, d: true}
+      iex> map = %{a: %{b: 1, c: 2}, d: %{e: 3, f: 4}, g: %{h: 5}}
+      iex> rule = %{a: %{c: true}, d: true, g: %{i: true}}
       iex> Transmap.transform(map, rule)
+      %{a: %{c: 2}, d: %{e: 3, f: 4}, g: %{}}
+      iex> Transmap.transform(map, rule, diff: true)
       %{a: %{c: 2}, d: %{e: 3, f: 4}}
 
   Transfomation with _default:
@@ -43,6 +47,8 @@ defmodule Transmap do
       iex> map = %{a: %{b: 1, c: 2}, d: %{e: %{f: 3, g: 4}, h: 5}}
       iex> rule = %{_spread: [[:a], [:d, :e]], a: true, d: %{e: %{f: true}}}
       iex> Transmap.transform(map, rule)
+      %{b: 1, c: 2, d: %{}, f: 3}
+      iex> Transmap.transform(map, rule, diff: true)
       %{b: 1, c: 2, f: 3}
 
   Transformation with renaming:
@@ -53,12 +59,15 @@ defmodule Transmap do
       %{"A" => 1, "B" => 2, :C => %{6 => 3}, "G" => 5}
   """
   @spec transform(data :: any, rule :: any) :: any
-  def transform(data, _) when not is_map(data), do: data
-  def transform(data, true), do: data
-  def transform(data, rule) when is_map(data) do
+  def transform(data, rule, opts \\ [diff: false])
+  def transform(data, _, opts) when not is_map(data), do: data
+  def transform(data, true, opts), do: data
+  def transform(data, rule, opts) when is_map(data) do
     {default, rule} = Map.pop(rule, @default_key, false)
     {spread, rule} = Map.pop(rule, @spread_key, [])
     {data, rule} = apply_spread(data, rule, spread)
+    diff = Keyword.get(opts, :diff, false)
+
     Enum.reduce(data, %{}, fn {key, value}, result ->
       {key, rule_value} = case Map.get(rule, key, default) do
         boolean when is_boolean(boolean) -> {key, boolean}
@@ -67,10 +76,10 @@ defmodule Transmap do
         new_key -> {new_key, true}
       end
       if rule_value != false do
-        filtered = transform(value, rule_value)
-        case filtered do
-          map when is_map(map) and map_size(map) == 0 -> result
-          other -> Map.put(result, key, other)
+        filtered = transform(value, rule_value, opts)
+        case {filtered, diff} do
+          {map, true} when is_map(map) and map_size(map) == 0 -> result
+          {other, _} -> Map.put(result, key, other)
         end
       else
         result
