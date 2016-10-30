@@ -43,12 +43,24 @@ Transmap.transform(map, rule)
 Transmap.transform(map, rule, diff: true)
 == %{b: 1, c: 2, f: 3}
 
+map = %{a: %{b: %{c: 1, d: 2}}}
+rule = %{_spread: [[:a, :b]], a: %{b: %{_default: true, c: :C}}}
+Transmap.transform(map, rule)
+== %{C: 1, d: 2, a: %{}}
+Transmap.transform(map, rule, diff: true)
+== %{C: 1, d: 2}
+
 # Transformation with renaming:
 
 map = %{a: 1, b: 2, c: %{d: 3, e: 4}, f: %{g: 5}}
 rule = %{_spread: [[:f]], a: {"A", true}, b: "B", c: {:C, %{d: 6}}, f: %{g: "G"}}
 Transmap.transform(map, rule)
 == %{"A" => 1, "B" => 2, :C => %{6 => 3}, "G" => 5}
+
+map = %{a: 1, b: %{a: 2}, c: %{a: 3}}
+rule = %{_spread: [[:b], [:c]], a: true, b: %{a: :b}, c: %{a: {:c, true}}}
+Transmap.transform(map, rule)
+== %{a: 1, b: 2, c: 3}
 ```
 
 ## API

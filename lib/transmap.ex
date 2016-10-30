@@ -64,6 +64,11 @@ defmodule Transmap do
       iex> rule = %{_spread: [[:f]], a: {"A", true}, b: "B", c: {:C, %{d: 6}}, f: %{g: "G"}}
       iex> Transmap.transform(map, rule)
       %{"A" => 1, "B" => 2, :C => %{6 => 3}, "G" => 5}
+
+      iex> map = %{a: 1, b: %{a: 2}, c: %{a: 3}}
+      iex> rule = %{_spread: [[:b], [:c]], a: true, b: %{a: :b}, c: %{a: {:c, true}}}
+      iex> Transmap.transform(map, rule)
+      %{a: 1, b: 2, c: 3}
   """
   @spec transform(data :: any, rule :: any) :: any
   def transform(data, rule, opts \\ [])
@@ -76,12 +81,7 @@ defmodule Transmap do
     diff = Keyword.get(opts, :diff, false)
 
     Enum.reduce(data, %{}, fn {key, value}, result ->
-      {key, rule_value} = case Map.get(rule, key, default) do
-        boolean when is_boolean(boolean) -> {key, boolean}
-        {key, rule_value} -> {key, rule_value}
-        rule_value when is_map(rule_value) -> {key, rule_value}
-        new_key -> {new_key, true}
-      end
+      {key, rule_value} = with_key(key, Map.get(rule, key, default))
       if rule_value != false do
         filtered = transform(value, rule_value, opts)
         case {filtered, diff} do
@@ -99,21 +99,52 @@ defmodule Transmap do
       {data_map, data} = pop_in(data, keys)
       {rule_map, rule} = pop_in(rule, keys)
       if is_map(data_map) do
-        data = Map.merge(data, data_map)
-        rule = if is_map(rule_map) do
+        if is_map(rule_map) do
           {default, rule_map} = Map.pop(rule_map, @default_key, false)
           rule_map = Enum.reduce(data_map, rule_map, fn {key, _}, rule_map ->
             Map.put_new(rule_map, key, default)
           end)
-          Map.merge(rule, rule_map)
+          {data_map, rule_map} = apply_rename(data_map, rule_map)
+          data = Map.merge(data, data_map)
+          rule = Map.merge(rule, rule_map)
+          {data, rule}
         else
           rule_map = for {key, _} <- data_map, into: %{}, do: {key, true}
-          Map.merge(rule, rule_map)
+          data = Map.merge(data, data_map)
+          rule = Map.merge(rule, rule_map)
+          {data, rule}
         end
-        {data, rule}
       else
         {data, rule}
       end
     end)
+  end
+
+  defp apply_rename(data_map, rule_map) do
+    reducer = fn {key, rule}, {data_map, rule_map} ->
+      {new_key, rule} = with_key(key, rule)
+      if key == new_key do
+        {data_map, rule_map}
+      else
+        rule_map = rule_map |> Map.delete(key) |> Map.put(new_key, rule)
+        data_map = if Map.has_key?(data_map, key) do
+          {data, data_map} = Map.pop(data_map, key)
+          Map.put(data_map, new_key, data)
+        else
+          data_map
+        end
+        {data_map, rule_map}
+      end
+    end
+    Enum.reduce(rule_map, {data_map, rule_map}, reducer)
+  end
+
+  defp with_key(key, rule) do
+    case rule do
+      boolean when is_boolean(boolean) -> {key, boolean}
+      {key, rule_value} -> {key, rule_value}
+      rule_value when is_map(rule_value) -> {key, rule_value}
+      new_key -> {new_key, true}
+    end
   end
 end
