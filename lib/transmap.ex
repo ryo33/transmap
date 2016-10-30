@@ -51,6 +51,13 @@ defmodule Transmap do
       iex> Transmap.transform(map, rule, diff: true)
       %{b: 1, c: 2, f: 3}
 
+      iex> map = %{a: %{b: %{c: 1, d: 2}}}
+      iex> rule = %{_spread: [[:a, :b]], a: %{b: %{_default: true, c: :C}}}
+      iex> Transmap.transform(map, rule)
+      %{C: 1, d: 2, a: %{}}
+      iex> Transmap.transform(map, rule, diff: true)
+      %{C: 1, d: 2}
+
   Transformation with renaming:
 
       iex> map = %{a: 1, b: 2, c: %{d: 3, e: 4}, f: %{g: 5}}
@@ -59,7 +66,7 @@ defmodule Transmap do
       %{"A" => 1, "B" => 2, :C => %{6 => 3}, "G" => 5}
   """
   @spec transform(data :: any, rule :: any) :: any
-  def transform(data, rule, opts \\ [diff: false])
+  def transform(data, rule, opts \\ [])
   def transform(data, _, opts) when not is_map(data), do: data
   def transform(data, true, opts), do: data
   def transform(data, rule, opts) when is_map(data) do
@@ -94,6 +101,10 @@ defmodule Transmap do
       if is_map(data_map) do
         data = Map.merge(data, data_map)
         rule = if is_map(rule_map) do
+          {default, rule_map} = Map.pop(rule_map, @default_key, false)
+          rule_map = Enum.reduce(data_map, rule_map, fn {key, _}, rule_map ->
+            Map.put_new(rule_map, key, default)
+          end)
           Map.merge(rule, rule_map)
         else
           rule_map = for {key, _} <- data_map, into: %{}, do: {key, true}
